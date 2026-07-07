@@ -12,8 +12,8 @@ More simply, you can use it by running the following commands in order. However,
 
 ```bash
 sudo -v
-curl "https://github.com/taiseiue/pbcopy/blob/main/src/pbcopy  | sudo tee /usr/local/bin/pbcopy  >/dev/null
-curl "https://github.com/taiseiue/pbcopy/blob/main/src/pbpaste | sudo tee /usr/local/bin/pbpaste >/dev/null
+curl "https://github.com/taiseiue/pbcopy/blob/main/src/pbcopy"  | sudo tee /usr/local/bin/pbcopy  >/dev/null
+curl "https://github.com/taiseiue/pbcopy/blob/main/src/pbpaste" | sudo tee /usr/local/bin/pbpaste >/dev/null
 sudo chmod +x /usr/local/bin/pbcopy /usr/local/bin/pbpaste
 ```
 

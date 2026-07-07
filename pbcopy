@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# pbcopy
+# Usage: echo "text" | pbcopy
+#         pbcopy < file.txt
+#         pbcopy "text"
+
+set -euo pipefail
+
+if [[ $# -gt 0 ]]; then
+  data="$*"
+else
+  data="$(cat)"
+fi
+
+if base64 --version &>/dev/null 2>&1; then
+  encoded="$(printf '%s' "$data" | base64 | tr -d '\n')"
+else
+  encoded="$(printf '%s' "$data" | base64 -w 0)"
+fi
+
+emit_osc52() {
+  local payload="$1"
+  printf '\033]52;c;%s\007' "$payload"
+}
+
+if [[ -n "${TMUX:-}" ]]; then
+  printf '\033Ptmux;\033\033]52;c;%s\007\033\\' "$encoded"
+elif [[ "${TERM:-}" == screen* ]]; then
+  printf '\033P\033]52;c;%s\007\033\\' "$encoded"
+else
+  emit_osc52 "$encoded"
+fi
+
+if [[ -w /dev/tty ]]; then
+  :
+fi
+
+{
+  if [[ -n "${TMUX:-}" ]]; then
+    printf '\033Ptmux;\033\033]52;c;%s\007\033\\' "$encoded"
+  elif [[ "${TERM:-}" == screen* ]]; then
+    printf '\033P\033]52;c;%s\007\033\\' "$encoded"
+  else
+    printf '\033]52;c;%s\007' "$encoded"
+  fi
+} > /dev/tty
+
+byte_count=${#data}
+printf '%d bytes copied to clipboard\n' "$byte_count" >&2
+

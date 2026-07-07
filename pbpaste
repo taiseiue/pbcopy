@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# pbpaste
+# Note: Requires terminal emulators support.
+#       Available: iTerm2, xterm, wezterm
+# Usage: pbpaste
+#         pbpaste | grep "pattern"
+
+set -euo pipefail
+
+request_clipboard() {
+  local tty_dev="/dev/tty"
+
+  if [[ ! -r "$tty_dev" ]] || [[ ! -w "$tty_dev" ]]; then
+    echo "pbpaste: cannot access /dev/tty" >&2
+    exit 1
+  fi
+  local old_stty
+  old_stty=$(stty -g < "$tty_dev")
+
+  trap 'stty "$old_stty" < "$tty_dev"' EXIT INT TERM
+
+  stty raw -echo min 0 time 3 < "$tty_dev"
+
+  if [[ -n "${TMUX:-}" ]]; then
+    printf '\033Ptmux;\033\033]52;c;?\007\033\\' > "$tty_dev"
+  elif [[ "${TERM:-}" == screen* ]]; then
+    printf '\033P\033]52;c;?\007\033\\' > "$tty_dev"
+  else
+    printf '\033]52;c;?\007' > "$tty_dev"
+  fi
+
+  local response=""
+  local char
+  local timeout=30  # 3秒 (time 3 = 0.3秒 × 10)
+  local count=0
+
+  while [[ $count -lt $timeout ]]; do
+    char=$(dd if="$tty_dev" bs=1 count=1 2>/dev/null || true)
+    if [[ -z "$char" ]]; then
+      ((count++)) || true
+      continue
+    fi
+    response+="$char"
+    count=0
+
+    # BEL (\a = \007) で終端
+    if [[ "$response" == *$'\007' ]]; then
+      break
+    fi
+  done
+
+  stty "$old_stty" < "$tty_dev"
+  trap - EXIT INT TERM
+
+  local base64_data
+  base64_data=$(printf '%s' "$response" | sed 's/.*]52;c;//; s/\x07//')
+
+  if [[ -z "$base64_data" ]] || [[ "$base64_data" == "?" ]]; then
+    echo "pbpaste: terminal did not respond to OSC52 paste" >&2
+    echo "Please check if your terminal emulator supports OSC52 reading" >&2
+    exit 1
+  fi
+
+  if base64 --version &>/dev/null 2>&1; then
+    printf '%s' "$base64_data" | base64 --decode
+  else
+    printf '%s' "$base64_data" | base64 -d
+  fi
+}
+
+request_clipboard
+
